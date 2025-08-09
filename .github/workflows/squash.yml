@@ -1,0 +1,39 @@
+name: Auto Squash Commits in images/
+
+on:
+  push:
+    paths:
+      - 'images/**'
+      - '.github/workflows/squash.yml'
+    branches:
+      - main
+
+jobs:
+  squash:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code with PAT
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PUSH_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@example.com"
+
+      - name: Squash image commits
+        run: |
+          base_commit=$(git rev-list --max-parents=0 HEAD)
+          git reset --soft $base_commit
+          git add .
+          git commit -m "chore(images): squash image commits"
+
+      - name: Push squash commit using PAT
+        env:
+          TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/LucienVen/photo-bed.git
+          git push origin main --force
