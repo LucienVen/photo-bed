@@ -1,0 +1,52 @@
+name: Auto Squash Commits in images/
+
+on:
+  push:
+    paths:
+      - 'images/**'
+      - '.github/workflows/squash.yml'
+    branches:
+      - main
+  workflow_dispatch: # 手动触发
+
+# 保证同一时间只执行一个 squash 任务，新触发会取消旧的
+concurrency:
+  group: squash-images
+  cancel-in-progress: true
+
+jobs:
+  squash:
+    # 跳过由机器人推送触发的运行，避免死循环
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code with PAT
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PUSH_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@example.com"
+
+      - name: Squash image commits
+        run: |
+          base_commit=$(git rev-list --max-parents=0 HEAD)
+          git reset --soft $base_commit
+          git add .
+          # 如果没有变更则退出
+          if git diff --cached --quiet; then
+            echo "No changes detected, skipping commit and push."
+            exit 0
+          fi
+          git commit -m "[skip ci] chore(images): squash image commits"
+
+      - name: Push squash commit using PAT
+        env:
+          TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/LucienVen/photo-bed.git
+          git push origin main --force
